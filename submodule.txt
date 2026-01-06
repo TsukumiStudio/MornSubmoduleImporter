@@ -26,4 +26,4 @@ https://github.com/TsukumiStudio/MornTransition.git
 https://github.com/TsukumiStudio/MornTween.git
 https://github.com/TsukumiStudio/MornUGUI.git
 https://github.com/TsukumiStudio/MornUtil.git
-https://github.com/TsukumiStudio/MornSaveFlag.git
+https://github.com/TsukumiStudio/MornSaveKey.git
