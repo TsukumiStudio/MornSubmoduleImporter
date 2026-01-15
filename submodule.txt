@@ -18,6 +18,7 @@ https://github.com/TsukumiStudio/MornNovel.git
 https://github.com/TsukumiStudio/MornParameter.git
 https://github.com/TsukumiStudio/MornProcess.git
 https://github.com/TsukumiStudio/MornSave.git
+https://github.com/TsukumiStudio/MornSaveKey.git
 https://github.com/TsukumiStudio/MornScene.git
 https://github.com/TsukumiStudio/MornSound.git
 https://github.com/TsukumiStudio/MornSpreadSheet.git
@@ -26,4 +27,3 @@ https://github.com/TsukumiStudio/MornTransition.git
 https://github.com/TsukumiStudio/MornTween.git
 https://github.com/TsukumiStudio/MornUGUI.git
 https://github.com/TsukumiStudio/MornUtil.git
-https://github.com/TsukumiStudio/MornSaveKey.git
