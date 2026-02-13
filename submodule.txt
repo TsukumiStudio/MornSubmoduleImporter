@@ -7,7 +7,6 @@ https://github.com/TsukumiStudio/MornDirector.git
 https://github.com/TsukumiStudio/MornEase.git
 https://github.com/TsukumiStudio/MornEditor.git
 https://github.com/TsukumiStudio/MornEnum.git
-https://github.com/TsukumiStudio/MornFlag.git
 https://github.com/TsukumiStudio/MornGit.git
 https://github.com/TsukumiStudio/MornGlobal.git
 https://github.com/TsukumiStudio/MornInput.git
@@ -27,3 +26,4 @@ https://github.com/TsukumiStudio/MornTransition.git
 https://github.com/TsukumiStudio/MornTween.git
 https://github.com/TsukumiStudio/MornUGUI.git
 https://github.com/TsukumiStudio/MornUtil.git
+https://github.com/TsukumiStudio/MornWebUtil.git
