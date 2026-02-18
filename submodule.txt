@@ -17,6 +17,7 @@ https://github.com/TsukumiStudio/MornLua.git
 https://github.com/TsukumiStudio/MornNovel.git
 https://github.com/TsukumiStudio/MornParameter.git
 https://github.com/TsukumiStudio/MornProcess.git
+https://github.com/TsukumiStudio/MornRaycastDebugger.git
 https://github.com/TsukumiStudio/MornSave.git
 https://github.com/TsukumiStudio/MornSaveKey.git
 https://github.com/TsukumiStudio/MornScene.git
