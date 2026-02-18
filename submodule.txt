@@ -1,3 +1,4 @@
+https://github.com/TsukumiStudio/MornAnimation.git
 https://github.com/TsukumiStudio/MornArbor.git
 https://github.com/TsukumiStudio/MornAspect.git
 https://github.com/TsukumiStudio/MornBeat.git
