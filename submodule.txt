@@ -21,6 +21,7 @@ https://github.com/TsukumiStudio/MornSave.git
 https://github.com/TsukumiStudio/MornSaveKey.git
 https://github.com/TsukumiStudio/MornScene.git
 https://github.com/TsukumiStudio/MornSound.git
+https://github.com/TsukumiStudio/MornSoundSlider.git
 https://github.com/TsukumiStudio/MornSpreadSheet.git
 https://github.com/TsukumiStudio/MornSteam.git
 https://github.com/TsukumiStudio/MornTransition.git
