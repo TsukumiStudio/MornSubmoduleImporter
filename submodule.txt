@@ -16,6 +16,7 @@ https://github.com/TsukumiStudio/MornLib.git
 https://github.com/TsukumiStudio/MornLocalize.git
 https://github.com/TsukumiStudio/MornLua.git
 https://github.com/TsukumiStudio/MornNovel.git
+https://github.com/TsukumiStudio/MornOptimizer.git
 https://github.com/TsukumiStudio/MornParameter.git
 https://github.com/TsukumiStudio/MornProcess.git
 https://github.com/TsukumiStudio/MornSave.git
