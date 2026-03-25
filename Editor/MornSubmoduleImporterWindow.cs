@@ -126,6 +126,28 @@ namespace MornSubmoduleImporter
                             {
                                 statusStyle.normal.textColor = Color.green;
                                 GUILayout.Label("Installed", statusStyle, GUILayout.Width(80));
+
+                                // 更新ボタン
+                                using (new EditorGUI.DisabledScope(_isProcessing))
+                                {
+                                    if (GUILayout.Button("Update", GUILayout.Width(60)))
+                                    {
+                                        UpdateSubmodule(submodule);
+                                    }
+                                }
+
+                                // 削除ボタン
+                                using (new EditorGUI.DisabledScope(_isProcessing))
+                                {
+                                    var oldColor = GUI.backgroundColor;
+                                    GUI.backgroundColor = new Color(1f, 0.4f, 0.4f);
+                                    if (GUILayout.Button("Delete", GUILayout.Width(60)))
+                                    {
+                                        RemoveSubmodule(submodule);
+                                    }
+
+                                    GUI.backgroundColor = oldColor;
+                                }
                             }
                             else
                             {
@@ -309,6 +331,174 @@ namespace MornSubmoduleImporter
             {
                 _isProcessing = false;
                 _currentProcessingModule = "";
+            }
+        }
+
+        private async void UpdateSubmodule(SubmoduleInfo submodule)
+        {
+            _isProcessing = true;
+            _currentProcessingModule = submodule.Name;
+            _progress = 0.5f;
+            Repaint();
+
+            try
+            {
+                var submodulePath = Path.Combine("Assets", "_Morn", submodule.Name);
+                var projectRoot = Path.GetDirectoryName(Application.dataPath);
+
+                var success = await RunGitCommandAsync(
+                    projectRoot,
+                    $"submodule update --remote {submodulePath}"
+                );
+
+                if (success)
+                {
+                    Debug.Log($"Submodule更新成功: {submodule.Name}");
+                    EditorUtility.DisplayDialog("完了", $"{submodule.Name} を最新に更新しました。", "OK");
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("エラー", $"{submodule.Name} の更新に失敗しました。詳細はConsoleを確認してください。", "OK");
+                }
+
+                AssetDatabase.Refresh();
+            }
+            finally
+            {
+                _isProcessing = false;
+                _currentProcessingModule = "";
+                Repaint();
+            }
+        }
+
+        private async void RemoveSubmodule(SubmoduleInfo submodule)
+        {
+            if (!EditorUtility.DisplayDialog(
+                    "確認",
+                    $"{submodule.Name} を完全に削除します。\n\n" +
+                    "・git submodule登録の解除\n" +
+                    "・ファイルの削除\n" +
+                    "・.git/modules内の削除\n\n" +
+                    "この操作は元に戻せません。続行しますか？",
+                    "削除する",
+                    "キャンセル"))
+            {
+                return;
+            }
+
+            _isProcessing = true;
+            _currentProcessingModule = submodule.Name;
+            _progress = 0f;
+            Repaint();
+
+            try
+            {
+                var submodulePath = Path.Combine("Assets", "_Morn", submodule.Name);
+                var projectRoot = Path.GetDirectoryName(Application.dataPath);
+
+                // 1. git submodule deinit
+                _progress = 0.25f;
+                Repaint();
+                var success = await RunGitCommandAsync(projectRoot, $"submodule deinit -f {submodulePath}");
+                if (!success)
+                {
+                    EditorUtility.DisplayDialog("エラー", $"{submodule.Name} の deinit に失敗しました。詳細はConsoleを確認してください。", "OK");
+                    return;
+                }
+
+                // 2. git rm
+                _progress = 0.5f;
+                Repaint();
+                success = await RunGitCommandAsync(projectRoot, $"rm -f {submodulePath}");
+                if (!success)
+                {
+                    EditorUtility.DisplayDialog("エラー", $"{submodule.Name} の git rm に失敗しました。詳細はConsoleを確認してください。", "OK");
+                    return;
+                }
+
+                // 3. .git/modules 内のディレクトリを削除
+                _progress = 0.75f;
+                Repaint();
+                var gitModulesPath = Path.Combine(projectRoot, ".git", "modules", submodulePath);
+                if (Directory.Exists(gitModulesPath))
+                {
+                    Directory.Delete(gitModulesPath, true);
+                    Debug.Log($".git/modules/{submodulePath} を削除しました");
+                }
+
+                // 4. ディレクトリが残っていれば削除
+                var fullPath = Path.Combine(projectRoot, submodulePath);
+                if (Directory.Exists(fullPath))
+                {
+                    Directory.Delete(fullPath, true);
+                    Debug.Log($"{submodulePath} ディレクトリを削除しました");
+                }
+
+                // .meta ファイルも削除
+                var metaPath = fullPath + ".meta";
+                if (File.Exists(metaPath))
+                {
+                    File.Delete(metaPath);
+                    Debug.Log($"{submodulePath}.meta を削除しました");
+                }
+
+                _progress = 1f;
+                Debug.Log($"Submodule完全削除成功: {submodule.Name}");
+                EditorUtility.DisplayDialog("完了", $"{submodule.Name} を完全に削除しました。", "OK");
+
+                RefreshSubmoduleList();
+                AssetDatabase.Refresh();
+            }
+            finally
+            {
+                _isProcessing = false;
+                _currentProcessingModule = "";
+                Repaint();
+            }
+        }
+
+        private async System.Threading.Tasks.Task<bool> RunGitCommandAsync(string workingDirectory, string arguments)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "git",
+                        Arguments = arguments,
+                        WorkingDirectory = workingDirectory,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+                await System.Threading.Tasks.Task.Run(() => process.WaitForExit());
+                var output = await outputTask;
+                var error = await errorTask;
+
+                if (process.ExitCode != 0)
+                {
+                    Debug.LogError($"git {arguments} エラー: {error}");
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(output))
+                {
+                    Debug.Log($"git {arguments}: {output}");
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"git {arguments} 例外: {ex.Message}");
+                return false;
             }
         }
 
