@@ -50,6 +50,14 @@ namespace MornSubmoduleImporter
             {
                 GUILayout.Label("Morn Submodule Manager", EditorStyles.boldLabel);
                 GUILayout.FlexibleSpace();
+                using (new EditorGUI.DisabledScope(_isProcessing))
+                {
+                    if (GUILayout.Button("Update All", GUILayout.Width(100)))
+                    {
+                        UpdateAllSubmodules();
+                    }
+                }
+
                 if (GUILayout.Button("Refresh", GUILayout.Width(80)))
                 {
                     RefreshSubmoduleList();
@@ -331,6 +339,42 @@ namespace MornSubmoduleImporter
             {
                 _isProcessing = false;
                 _currentProcessingModule = "";
+            }
+        }
+
+        private async void UpdateAllSubmodules()
+        {
+            _isProcessing = true;
+            _currentProcessingModule = "All Submodules";
+            _progress = 0f;
+            Repaint();
+
+            try
+            {
+                var projectRoot = Path.GetDirectoryName(Application.dataPath);
+
+                _progress = 0.5f;
+                Repaint();
+                var success = await RunGitCommandAsync(projectRoot, "submodule update --init --recursive --force");
+
+                if (success)
+                {
+                    Debug.Log("全Submodule更新成功");
+                    EditorUtility.DisplayDialog("完了", "全てのsubmoduleを最新に更新しました。", "OK");
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("エラー", "submoduleの更新に失敗しました。詳細はConsoleを確認してください。", "OK");
+                }
+
+                RefreshSubmoduleList();
+                AssetDatabase.Refresh();
+            }
+            finally
+            {
+                _isProcessing = false;
+                _currentProcessingModule = "";
+                Repaint();
             }
         }
 
