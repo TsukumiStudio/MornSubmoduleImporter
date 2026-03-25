@@ -113,13 +113,20 @@ namespace MornSubmoduleImporter
 
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            // チェックボックス（インストール済みの場合は無効化）
-                            using (new EditorGUI.DisabledScope(submodule.IsInstalled || _isProcessing))
+                            // チェックボックス（インストール済みの場合はスペースのみ）
+                            if (submodule.IsInstalled)
                             {
-                                submodule.IsSelected = EditorGUILayout.Toggle(
-                                    submodule.IsSelected,
-                                    GUILayout.Width(50)
-                                );
+                                GUILayout.Space(50);
+                            }
+                            else
+                            {
+                                using (new EditorGUI.DisabledScope(_isProcessing))
+                                {
+                                    submodule.IsSelected = EditorGUILayout.Toggle(
+                                        submodule.IsSelected,
+                                        GUILayout.Width(50)
+                                    );
+                                }
                             }
 
                             // リポジトリ名
