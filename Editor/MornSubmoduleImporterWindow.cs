@@ -113,10 +113,10 @@ namespace MornSubmoduleImporter
 
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            // チェックボックス（インストール済みの場合はスペースのみ）
+                            // チェックボックス（インストール済みの場合は同幅の空白）
                             if (submodule.IsInstalled)
                             {
-                                GUILayout.Space(50);
+                                GUILayout.Label("", GUILayout.Width(50));
                             }
                             else
                             {
