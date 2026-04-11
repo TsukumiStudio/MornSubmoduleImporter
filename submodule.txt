@@ -10,7 +10,6 @@ https://github.com/TsukumiStudio/MornDrawing.git
 https://github.com/TsukumiStudio/MornEase.git
 https://github.com/TsukumiStudio/MornEditor.git
 https://github.com/TsukumiStudio/MornEnum.git
-https://github.com/TsukumiStudio/MornGit.git
 https://github.com/TsukumiStudio/MornGlobal.git
 https://github.com/TsukumiStudio/MornInput.git
 https://github.com/TsukumiStudio/MornLib.git

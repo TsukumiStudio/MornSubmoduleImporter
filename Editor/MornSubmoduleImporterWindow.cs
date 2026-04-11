@@ -295,6 +295,35 @@ namespace MornSubmoduleImporter
             return name;
         }
 
+        private bool TryDeleteDirectory(string path)
+        {
+            if (!Directory.Exists(path))
+            {
+                return true;
+            }
+
+            try
+            {
+                // .git/modules 内には read-only 属性のファイルが含まれることがあるので解除してから削除
+                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                {
+                    var attrs = File.GetAttributes(file);
+                    if ((attrs & FileAttributes.ReadOnly) != 0)
+                    {
+                        File.SetAttributes(file, attrs & ~FileAttributes.ReadOnly);
+                    }
+                }
+
+                Directory.Delete(path, true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"{path} の削除に失敗しました: {ex.Message}");
+                return false;
+            }
+        }
+
         private async void AddSelectedSubmodules()
         {
             var selectedModules = _submodules.Where(s => s.IsSelected && !s.IsInstalled).ToList();
@@ -442,60 +471,85 @@ namespace MornSubmoduleImporter
             _progress = 0f;
             Repaint();
 
+            var errors = new List<string>();
             try
             {
                 var submodulePath = Path.Combine("Assets", "_Morn", submodule.Name);
                 var projectRoot = Path.GetDirectoryName(Application.dataPath);
 
                 // 1. git submodule deinit
-                _progress = 0.25f;
+                _progress = 0.2f;
                 Repaint();
-                var success = await RunGitCommandAsync(projectRoot, $"submodule deinit -f {submodulePath}");
-                if (!success)
+                var deinitOk = await RunGitCommandAsync(projectRoot, $"submodule deinit -f {submodulePath}");
+                if (!deinitOk)
                 {
-                    EditorUtility.DisplayDialog("エラー", $"{submodule.Name} の deinit に失敗しました。詳細はConsoleを確認してください。", "OK");
-                    return;
+                    errors.Add("git submodule deinit");
                 }
 
                 // 2. git rm
-                _progress = 0.5f;
+                _progress = 0.4f;
                 Repaint();
-                success = await RunGitCommandAsync(projectRoot, $"rm -f {submodulePath}");
-                if (!success)
+                var rmOk = await RunGitCommandAsync(projectRoot, $"rm -f {submodulePath}");
+                if (!rmOk)
                 {
-                    EditorUtility.DisplayDialog("エラー", $"{submodule.Name} の git rm に失敗しました。詳細はConsoleを確認してください。", "OK");
-                    return;
+                    errors.Add("git rm");
                 }
 
-                // 3. .git/modules 内のディレクトリを削除
-                _progress = 0.75f;
+                // 3. .git/modules 内のディレクトリを削除（失敗してもここまで必ず到達する）
+                _progress = 0.6f;
                 Repaint();
                 var gitModulesPath = Path.Combine(projectRoot, ".git", "modules", submodulePath);
-                if (Directory.Exists(gitModulesPath))
+                if (!TryDeleteDirectory(gitModulesPath))
                 {
-                    Directory.Delete(gitModulesPath, true);
+                    errors.Add(".git/modules 削除");
+                }
+                else if (Directory.Exists(Path.GetDirectoryName(gitModulesPath)) == false)
+                {
                     Debug.Log($".git/modules/{submodulePath} を削除しました");
                 }
 
                 // 4. ディレクトリが残っていれば削除
+                _progress = 0.8f;
+                Repaint();
                 var fullPath = Path.Combine(projectRoot, submodulePath);
-                if (Directory.Exists(fullPath))
+                if (!TryDeleteDirectory(fullPath))
                 {
-                    Directory.Delete(fullPath, true);
-                    Debug.Log($"{submodulePath} ディレクトリを削除しました");
+                    errors.Add($"{submodulePath} ディレクトリ削除");
                 }
 
-                // .meta ファイルも削除
+                // 5. .meta ファイルも削除
                 var metaPath = fullPath + ".meta";
                 if (File.Exists(metaPath))
                 {
-                    File.Delete(metaPath);
-                    Debug.Log($"{submodulePath}.meta を削除しました");
+                    try
+                    {
+                        File.Delete(metaPath);
+                        Debug.Log($"{submodulePath}.meta を削除しました");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.LogError($"{submodulePath}.meta の削除に失敗しました: {ex.Message}");
+                        errors.Add($"{submodulePath}.meta 削除");
+                    }
                 }
 
                 _progress = 1f;
-                Debug.Log($"Submodule完全削除成功: {submodule.Name}");
-                EditorUtility.DisplayDialog("完了", $"{submodule.Name} を完全に削除しました。", "OK");
+                if (errors.Count == 0)
+                {
+                    Debug.Log($"Submodule完全削除成功: {submodule.Name}");
+                    EditorUtility.DisplayDialog("完了", $"{submodule.Name} を完全に削除しました。", "OK");
+                }
+                else
+                {
+                    Debug.LogWarning($"Submodule削除で一部失敗しました ({submodule.Name}): {string.Join(", ", errors)}");
+                    EditorUtility.DisplayDialog(
+                        "一部失敗",
+                        $"{submodule.Name} の削除中に以下のステップで失敗しました:\n" +
+                        $"- {string.Join("\n- ", errors)}\n\n" +
+                        "詳細はConsoleを確認してください。",
+                        "OK"
+                    );
+                }
 
                 RefreshSubmoduleList();
                 AssetDatabase.Refresh();
