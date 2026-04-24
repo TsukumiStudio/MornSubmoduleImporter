@@ -11,6 +11,7 @@ https://github.com/TsukumiStudio/MornEditor.git
 https://github.com/TsukumiStudio/MornEnum.git
 https://github.com/TsukumiStudio/MornGarage.git
 https://github.com/TsukumiStudio/MornGlobal.git
+https://github.com/TsukumiStudio/MornInject.git
 https://github.com/TsukumiStudio/MornInput.git
 https://github.com/TsukumiStudio/MornLocalize.git
 https://github.com/TsukumiStudio/MornLua.git
