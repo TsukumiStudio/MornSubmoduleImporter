@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
@@ -17,6 +18,9 @@ namespace MornSubmoduleImporter
             public string Name { get; set; }
             public bool IsInstalled { get; set; }
             public bool IsSelected { get; set; }
+            public string CurrentVersion { get; set; }
+            public string LatestVersion { get; set; }
+            public List<string> Dependencies { get; set; } = new List<string>();
         }
 
         private List<SubmoduleInfo> _submodules = new List<SubmoduleInfo>();
@@ -95,8 +99,9 @@ namespace MornSubmoduleImporter
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         GUILayout.Label("Select", GUILayout.Width(50));
-                        GUILayout.Label("Repository", GUILayout.Width(200));
-                        GUILayout.Label("URL", GUILayout.MinWidth(200));
+                        GUILayout.Label("Repository", GUILayout.Width(180));
+                        GUILayout.Label("Dependencies", GUILayout.MinWidth(180));
+                        GUILayout.Label("Version", GUILayout.Width(140));
                         GUILayout.Label("Status", GUILayout.Width(80));
                     }
 
@@ -130,10 +135,16 @@ namespace MornSubmoduleImporter
                             }
 
                             // リポジトリ名
-                            GUILayout.Label(submodule.Name, GUILayout.Width(200));
+                            GUILayout.Label(submodule.Name, GUILayout.Width(180));
 
-                            // URL
-                            GUILayout.Label(submodule.Url, GUILayout.MinWidth(200));
+                            // 依存ライブラリ
+                            var depsText = submodule.Dependencies.Count > 0
+                                ? string.Join(", ", submodule.Dependencies)
+                                : (submodule.IsInstalled ? "-" : "");
+                            GUILayout.Label(depsText, GUILayout.MinWidth(180));
+
+                            // バージョン (current → latest)
+                            DrawVersionLabel(submodule);
 
                             // ステータス
                             var statusStyle = new GUIStyle(GUI.skin.label);
@@ -230,13 +241,165 @@ namespace MornSubmoduleImporter
                 var repoName = GetRepositoryNameFromUrl(trimmedLine);
                 var submodulePath = Path.Combine("Assets", "_Morn", repoName);
 
-                _submodules.Add(new SubmoduleInfo
+                var info = new SubmoduleInfo
                 {
                     Url = trimmedLine,
                     Name = repoName,
                     IsInstalled = installedSubmodules.Contains(submodulePath),
                     IsSelected = false
-                });
+                };
+                if (info.IsInstalled)
+                {
+                    PopulatePackageInfo(info, submodulePath);
+                }
+
+                _submodules.Add(info);
+            }
+        }
+
+        private void DrawVersionLabel(SubmoduleInfo submodule)
+        {
+            if (!submodule.IsInstalled)
+            {
+                GUILayout.Label("", GUILayout.Width(140));
+                return;
+            }
+
+            var current = string.IsNullOrEmpty(submodule.CurrentVersion) ? "-" : submodule.CurrentVersion;
+            var latest = string.IsNullOrEmpty(submodule.LatestVersion) ? "-" : submodule.LatestVersion;
+            var style = new GUIStyle(GUI.skin.label);
+            string text;
+            if (current == "-" && latest == "-")
+            {
+                text = "-";
+            }
+            else if (current == latest)
+            {
+                text = current;
+                style.normal.textColor = Color.green;
+            }
+            else
+            {
+                text = $"{current} → {latest}";
+                style.normal.textColor = new Color(1f, 0.7f, 0.2f);
+            }
+
+            GUILayout.Label(text, style, GUILayout.Width(140));
+        }
+
+        private void PopulatePackageInfo(SubmoduleInfo submodule, string submodulePath)
+        {
+            // package.json は ルート or src/ 配下を探す
+            var projectRoot = Path.GetDirectoryName(Application.dataPath);
+            var (relPackageJson, localPackageJsonAbs) = ResolvePackageJsonPath(Path.Combine(projectRoot, submodulePath));
+
+            if (relPackageJson == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var localJson = File.ReadAllText(localPackageJsonAbs);
+                submodule.CurrentVersion = ParseVersion(localJson);
+                submodule.Dependencies = ParseDependencies(localJson);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogWarning($"{submodule.Name} の package.json 読み込みに失敗: {ex.Message}");
+            }
+
+            // remote main の package.json
+            var fullSubmodulePath = Path.Combine(projectRoot, submodulePath);
+            var remoteJson = ReadFileFromGit(fullSubmodulePath, "origin/main", relPackageJson);
+            if (!string.IsNullOrEmpty(remoteJson))
+            {
+                submodule.LatestVersion = ParseVersion(remoteJson);
+            }
+        }
+
+        private static (string relPath, string absPath) ResolvePackageJsonPath(string submoduleAbsPath)
+        {
+            var rootCandidate = Path.Combine(submoduleAbsPath, "package.json");
+            if (File.Exists(rootCandidate))
+            {
+                return ("package.json", rootCandidate);
+            }
+
+            var srcCandidate = Path.Combine(submoduleAbsPath, "src", "package.json");
+            if (File.Exists(srcCandidate))
+            {
+                return ("src/package.json", srcCandidate);
+            }
+
+            return (null, null);
+        }
+
+        private static string ParseVersion(string json)
+        {
+            var match = Regex.Match(json, "\"version\"\\s*:\\s*\"([^\"]+)\"");
+            return match.Success ? match.Groups[1].Value : null;
+        }
+
+        private static List<string> ParseDependencies(string json)
+        {
+            var result = new List<string>();
+            var blockMatch = Regex.Match(json, "\"dependencies\"\\s*:\\s*\\{([^}]*)\\}", RegexOptions.Singleline);
+            if (!blockMatch.Success)
+            {
+                return result;
+            }
+
+            var entries = Regex.Matches(blockMatch.Groups[1].Value, "\"([^\"]+)\"\\s*:\\s*\"([^\"]+)\"");
+            foreach (Match entry in entries)
+            {
+                result.Add(ShortenPackageName(entry.Groups[1].Value));
+            }
+
+            return result;
+        }
+
+        private static string ShortenPackageName(string fullName)
+        {
+            // com.tsukumistudio.mornglobal -> MornGlobal
+            var lastDot = fullName.LastIndexOf('.');
+            var leaf = lastDot >= 0 ? fullName.Substring(lastDot + 1) : fullName;
+            if (leaf.StartsWith("morn") && leaf.Length > 4)
+            {
+                return "Morn" + char.ToUpper(leaf[4]) + leaf.Substring(5);
+            }
+
+            return string.IsNullOrEmpty(leaf) ? fullName : char.ToUpper(leaf[0]) + leaf.Substring(1);
+        }
+
+        private static string ReadFileFromGit(string workingDirectory, string revision, string relativePath)
+        {
+            try
+            {
+                var process = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "git",
+                        Arguments = $"show {revision}:{relativePath}",
+                        WorkingDirectory = workingDirectory,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                process.StandardError.ReadToEnd();
+                process.WaitForExit();
+
+                return process.ExitCode == 0 ? output : null;
+            }
+            catch
+            {
+                return null;
             }
         }
 
